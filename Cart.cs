@@ -1,5 +1,19 @@
 ﻿using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
+
+/* ~~~~~~~~~~ Class Info ~~~~~~~~~~
+ *  - Class for the main character which is a cart.
+ *  - The cart gets all the vector points of the edge collider and the cart lerps
+      to each point.  
+ *  - If the cart jumps or falls off an edge then you only lerp to
+      the x position of the vector point.  
+ *  - The rotation is determined by taking two
+      vector points and calculating the angle between them.  
+ *  - The cart slows down and speeds up according to certain angles of the track.  
+ *  - All cart sounds are in this script.  
+ *  - Gravity is on only when jumping or falling off the edge of a track. 
+ */
 
 public class Cart : MonoBehaviour
 {
@@ -36,6 +50,52 @@ public class Cart : MonoBehaviour
     public AudioClip cartJump;
     public AudioClip cartLand;
 
+    // The Track
+    public Track track;
+
+    // Store the vectors of the current track
+    public List<Vector2[]> vectorList;
+
+    // Stores all the edge colliders
+    public EdgeCollider2D[] storedEdgeColliders;
+
+    // Index for the list
+    public int listIndex = 0;
+
+    // Index for points
+    public int pointIndex = 0;
+
+    // Goes from 0 to 1 for the lerping process
+    public float lerpNumber = 0f;
+
+    // If transitioning to other track
+    public bool isTransition = false;
+
+    // Boolean for if rotation should take place
+    public bool isRotation = true;
+
+    // Stores the difference between 2 points
+    public Vector2 vectorDifference;
+
+    // Boolean for doing once
+    public bool doOnce = true;
+
+    // Store zRotation
+    public float storeZRotation = 0f;
+
+    // Used to store the new rotation (This needs to be set to a hidden object on the scene to work)
+    public Transform newRotation;
+
+    // Increment for changing the z rotation
+    public float increment = 0.01f;
+
+     // Used to increment move towards path
+    public float step = 0f;
+
+    // Adjustment for the cart size
+    public float sizeAdjustForCart = 0.3f;
+
+
 
 
     // Use this for initialization
@@ -46,6 +106,25 @@ public class Cart : MonoBehaviour
 
         // Get the audio sources
         audioSources = GetComponents<AudioSource>();
+
+        // Set the vectors of the track
+        vectorList = track.GetVectorList();
+
+        // Get the edge colliders
+        storedEdgeColliders = track.GetEdgeColliders();
+    }
+
+    // Update
+    void Update()
+    {
+
+        FollowTrack();
+
+        DetermineRotation();
+
+        DetermineIfFallen();
+
+        DetermineEndOfLevel();
     }
 
 
@@ -61,6 +140,38 @@ public class Cart : MonoBehaviour
         PlaySound();
 
 
+
+
+        // Set the step
+        step = speed * 0.015f;
+        //  step = speed * Time.deltaTime;
+
+
+
+        // If cart has not jumped and is not in transition
+        if (!GetComponent<Cart>().GetJump() && !isTransition)
+        {
+            // Cart follows the track
+            GetComponent<Transform>().position = Vector2.MoveTowards(GetComponent<Transform>().position,
+        new Vector2(vectorList[listIndex][pointIndex].x, vectorList[listIndex][pointIndex].y + sizeAdjustForCart), step);
+
+        }
+        // Else if in transition
+        else if (isTransition)
+        {
+            // Cart follows track x position only
+            GetComponent<Transform>().position = Vector2.MoveTowards(GetComponent<Transform>().position,
+        new Vector2(vectorList[listIndex][pointIndex].x, GetComponent<Transform>().position.y), step);
+        }
+        // This else is here because I might change it in the future
+        else
+        {
+            // Cart follows x position only
+            GetComponent<Transform>().position = Vector2.MoveTowards(GetComponent<Transform>().position,
+    new Vector2(vectorList[listIndex][pointIndex].x, GetComponent<Transform>().position.y), step);
+
+
+        }
     }
 
 
@@ -281,6 +392,165 @@ public class Cart : MonoBehaviour
 
     }
 
+    /*
+    * Cart follows each point in the edge colliders.  It switches to the other edge collider once
+    * it has gotten close to the last point of the previous edge collider.
+    */
+    void FollowTrack()
+    {
+        // If the carts position is close to the edge collider point
+        if (GetComponent<Transform>().position.x >= (vectorList[listIndex][pointIndex].x - 0.1f))
+        {
+            // If it is not the last point
+            if (pointIndex != (vectorList[listIndex].Length - 1))
+            {
+                // Increment point
+                pointIndex++;
+
+                // If has not jumped
+                if (!GetComponent<Cart>().GetJump())
+                {
+                    // Set lerp to 0
+                    lerpNumber = 0f;
+                }
+
+            }
+            // If it is last point
+            else
+            {
+                // Turn off edge collider
+                storedEdgeColliders[listIndex].enabled = false;
+
+                // Set boolean to true
+                isTransition = true;
+
+                // If not last edge collider
+                if (listIndex != (storedEdgeColliders.Length - 1))
+                {
+                    // Increment list
+                    listIndex++;
+
+                    // Set point to 0
+                    pointIndex = 0;
+
+                    // Set gravity to true
+                    GetComponent<Cart>().SetGravity(true);
+                }
+
+
+            }
+
+        }
+
+
+    }
+
+    /*
+     * Determines the rotation of the cart based on two points.  Subtract the two vectors and find the angle
+     * between them.
+     */
+    void DetermineRotation()
+    {
+        // If is rotation
+        if (isRotation)
+        {
+            // If point index is greater than 0
+            if (pointIndex > 0)
+            {
+
+                if (pointIndex + 1 < storedEdgeColliders[listIndex].points.Length)
+                {
+                    //  vectorDifference = vectorList[listIndex][pointIndex] - vectorList[listIndex][pointIndex + 1];
+
+                    // Get the vector difference
+                    vectorDifference = vectorList[listIndex][pointIndex - 1] - vectorList[listIndex][pointIndex];
+
+                    // Calculate zRotation
+                    zRotation = Mathf.Atan((vectorDifference.y) / (vectorDifference.x));
+                    zRotation = zRotation * (180 / Mathf.PI);
+
+                    // Set the zRotation for cart
+                    GetComponent<Cart>().SetZRotation(zRotation);
+
+                    // If cart jumped and doOnce is true
+                    if (GetComponent<Cart>().GetJump() && doOnce)
+                    {
+                        // Store zRotation
+                        storeZRotation = zRotation;
+
+                        // Set boolean to false
+                        doOnce = false;
+                    }
+
+                    // If cart has not jumped
+                    if (!GetComponent<Cart>().GetJump())
+                    {
+                        // Set rotation to the zRotation
+                        newRotation.eulerAngles = new Vector3(GetComponent<Transform>().rotation.x,
+                            GetComponent<Transform>().rotation.y, zRotation);
+                    }
+                    else
+                    {
+                        // If zRotation greater than 25
+                        if (storeZRotation > 25)
+                        {
+                            // Set to the stored rotation
+                            newRotation.eulerAngles = new Vector3(GetComponent<Transform>().rotation.x,
+                            GetComponent<Transform>().rotation.y, storeZRotation);
+                        }
+                        else
+                        {
+                            // Set rotation to 25
+                            newRotation.eulerAngles = new Vector3(GetComponent<Transform>().rotation.x,
+                            GetComponent<Transform>().rotation.y, 25);
+                        }
+
+
+
+                    }
+                }
+            }
+
+            // Lerp number for rotation speed
+            lerpNumber = lerpNumber + increment;
+
+            // Lerp the rotation
+            GetComponent<Transform>().rotation = Quaternion.Lerp(GetComponent<Transform>().rotation,
+                newRotation.rotation, lerpNumber);
+        }
+    }
+
+    /*
+    * Determines if cart has fallen off the track.
+    */
+    void DetermineIfFallen()
+    {
+
+        // If cart is 4 unitys below the current vector point y position
+        if (GetComponent<Transform>().position.y - vectorList[listIndex][pointIndex].y <= -4)
+        {
+            // Set game over to true
+            GameControl.control.SetGameOver(true);
+        }
+
+    }
+
+    /*
+    * Determines if main character beat the level.
+    */
+    void DetermineEndOfLevel()
+    {
+
+        // If cart has touched the last vector point in the last edge collider
+        if (GetComponent<Transform>().position.x >=
+            (vectorList[storedEdgeColliders.Length - 1][vectorList[storedEdgeColliders.Length - 1].Length - 1].x))
+        {
+            print("You win");
+
+            // Set the end
+            GameControl.control.SetIsEnd(true);
+        }
+    }
 
     public bool GetJump()
     {
@@ -306,6 +576,17 @@ public class Cart : MonoBehaviour
     public void SetZRotation(float z)
     {
         zRotation = z;
+    }
+
+    public int GetPointIndex()
+    {
+        return pointIndex;
+    }
+
+
+    public int GetListIndex()
+    {
+        return listIndex;
     }
 
 }

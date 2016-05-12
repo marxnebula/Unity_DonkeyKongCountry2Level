@@ -73,8 +73,8 @@ public class CameraTrack : MonoBehaviour {
        // step = speed * 0.015f;
 
         vectorList = GetComponent<Track>().GetVectorList();
-        listIndex = GetComponent<Track>().GetListIndex();
-        pointIndex = GetComponent<Track>().GetPointIndex();
+        listIndex = cart.GetComponent<Cart>().GetListIndex();
+        pointIndex = cart.GetComponent<Cart>().GetPointIndex();
 
         if(cart.GetComponent<Transform>().position.x - cartCamera.GetComponent<Transform>().position.x >= 0.3f)
         {

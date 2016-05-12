@@ -1,6 +1,12 @@
 ﻿using UnityEngine;
 using System.Collections;
 
+/* ~~~~~~~~~~ Class Info ~~~~~~~~~~
+ *  - Class that scrolls the background.
+ *  - The backgroun follows the main character.
+ *  - The background scrolls at a given speed and repeats 1 image over and over!
+ */
+
 public class OffsetScroller : MonoBehaviour {
 
     // Get the cart
